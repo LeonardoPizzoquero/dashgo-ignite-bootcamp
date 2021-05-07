@@ -2,11 +2,16 @@ import { Box, Button, Divider, Flex, Heading, HStack, VStack, SimpleGrid } from 
 import Link from "next/link";
 import { SubmitHandler, useForm } from 'react-hook-form'
 import * as yup from 'yup'
+import { useMutation } from 'react-query';
+import { useRouter } from "next/router";
 import { yupResolver } from '@hookform/resolvers/yup'
 
 import { Input } from "../../components/Form/Input";
 import { Header } from "../../components/Header";
 import { Sidebar } from "../../components/Sidebar";
+
+import { api } from "../../services/api";
+import { queryClient } from "../../services/queryClient";
 
 type CreateUserFormData = {
   name: string;
@@ -15,22 +20,42 @@ type CreateUserFormData = {
   password_confirmation: string;
 }
 
-const createUserFormSchema = yup.object().shape({
-  name: yup.string().required('Nome obrigatório'),
-  email: yup.string().required('E-mail obrigatório').email('E-mail inválido'),
-  password: yup.string().required('Senha obrigatória').min(6, 'No mínimo 6 caracteres'),
-  password_confirmation: yup.string().oneOf([
-    null, yup.ref('password')
-  ], 'As senhas precisam ser iguais'),
-})
+  const createUserFormSchema = yup.object().shape({
+    name: yup.string().required('Nome obrigatório'),
+    email: yup.string().required('E-mail obrigatório').email('E-mail inválido'),
+    password: yup.string().required('Senha obrigatória').min(6, 'No mínimo 6 caracteres'),
+    password_confirmation: yup.string().oneOf([
+      null, yup.ref('password')
+    ], 'As senhas precisam ser iguais'),
+  })
 
 export default function CreateUser() {
+  const router = useRouter()
+
+  const createUser = useMutation(async (user: CreateUserFormData) => {
+    const response = await api.post('users', {
+      user: {
+        ...user,
+        created_at: new Date(),
+      }
+    })
+
+    return response.data.user;
+  }, {
+    onSuccess: async () => {
+      await queryClient.invalidateQueries(['users'])
+    }
+  })
+  
+
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
     resolver: yupResolver(createUserFormSchema)
   })
 
-  const handleCreateUser: SubmitHandler<CreateUserFormData> = (values) => {
-    console.log(values)
+  const handleCreateUser: SubmitHandler<CreateUserFormData> = async (values) => {
+    await createUser.mutateAsync(values);
+
+    router.push('/users')
   }
 
   return (
